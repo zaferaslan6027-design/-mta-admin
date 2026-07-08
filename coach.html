@@ -672,54 +672,29 @@ function updateConnectionUI(connected) {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
     db = firebase.database();
+    FIREBASE_AUTH_READY = true; // Auth gerektirmiyor, direkt bağlan
 
-    var netConnected = false;
-    var authDone = false;
-
-    function checkReady() {
+    db.ref('.info/connected').on('value', function(snap) {
       var wasReady = USE_FIREBASE;
-      USE_FIREBASE = netConnected && authDone;
+      USE_FIREBASE = snap.val() === true;
       updateConnectionUI(USE_FIREBASE);
-      // Giriş sonrası listener'ları kur
       if (USE_FIREBASE && !wasReady && currentCoachId) {
         setupFirebaseListeners();
       }
-    }
-
-    db.ref('.info/connected').on('value', function(snap) {
-      netConnected = snap.val() === true;
-      checkReady();
-    });
-
-    firebase.auth().onAuthStateChanged(function(user) {
-      if (user) {
-        authDone = true;
-        FIREBASE_AUTH_READY = true;
-        console.log('[Firebase Mobil] Auth tamam');
-        checkReady();
-        // Login bekleme döngüsünü sonlandır
-        if (typeof loginWaitInterval !== 'undefined' && loginWaitInterval) {
-          clearInterval(loginWaitInterval);
-          loginWaitInterval = null;
-          if (typeof pendingLoginUser !== 'undefined' && pendingLoginUser) {
-            coachLoginAttempt(pendingLoginUser, pendingLoginPass);
-            pendingLoginUser = null;
-            pendingLoginPass = null;
-          }
+      // Bağlantı gelince bekleyen login'i çalıştır
+      if (USE_FIREBASE && loginWaitInterval) {
+        clearInterval(loginWaitInterval);
+        loginWaitInterval = null;
+        if (pendingLoginUser) {
+          coachLoginAttempt(pendingLoginUser, pendingLoginPass);
+          pendingLoginUser = null;
+          pendingLoginPass = null;
         }
-      } else {
-        authDone = false;
-        FIREBASE_AUTH_READY = false;
-        USE_FIREBASE = false;
-        firebase.auth().signInAnonymously().catch(function(err) {
-          console.error('[Firebase Mobil] Auth hatası:', err.code, err.message);
-          setLoginStatus('❌ Yetki hatası: ' + err.code, 'error');
-        });
       }
     });
 
   } catch(e) {
-    console.error('[Firebase Mobil] Init hatası:', e);
+    console.error('[Firebase Mobil] Init hatasi:', e);
   }
 })();
 
@@ -832,25 +807,26 @@ function setLoginStatus(msg, type) {
 }
 
 function coachLogin() {
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value.trim();
-  if (!u || !p) { showToast('Kullanıcı adı ve şifre girin!', 'error'); return; }
+  var u = document.getElementById('loginUser').value.trim();
+  var p = document.getElementById('loginPass').value.trim();
+  if (!u || !p) { showToast('Kullanici adi ve sifre girin!', 'error'); return; }
 
-  if (FIREBASE_AUTH_READY) {
+  if (USE_FIREBASE) {
+    // Direkt giriş
     coachLoginAttempt(u, p);
   } else {
-    // Auth henüz hazır değil — bekle (max 8 saniye)
-    setLoginStatus("🔄 Sunucuya bağlanılıyor...", "info");
+    // Bağlantı bekleniyor — max 8 saniye
+    setLoginStatus('🔄 Sunucuya bağlanılıyor...', 'info');
     pendingLoginUser = u;
     pendingLoginPass = p;
-    let waited = 0;
+    var waited = 0;
     if (loginWaitInterval) clearInterval(loginWaitInterval);
     loginWaitInterval = setInterval(function() {
       waited += 400;
-      if (FIREBASE_AUTH_READY) {
+      if (USE_FIREBASE) {
         clearInterval(loginWaitInterval);
         loginWaitInterval = null;
-        coachLoginAttempt(u, p);
+        coachLoginAttempt(pendingLoginUser, pendingLoginPass);
         pendingLoginUser = null;
         pendingLoginPass = null;
       } else if (waited >= 8000) {
@@ -858,7 +834,7 @@ function coachLogin() {
         loginWaitInterval = null;
         pendingLoginUser = null;
         pendingLoginPass = null;
-        setLoginStatus("❌ Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.", "error");
+        setLoginStatus('❌ Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.', 'error');
       }
     }, 400);
   }
