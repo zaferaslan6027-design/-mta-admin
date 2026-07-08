@@ -361,6 +361,16 @@
         <button onclick="goToday()" style="padding:0 10px;width:auto;font-size:12px;font-weight:700">Bugün</button>
       </div>
 
+      <!-- Atanmamış dersler -->
+      <div class="card" id="unassignedCard" style="border:2px solid #f59e0b;display:none">
+        <div class="card-header" style="background:#fffbeb">
+          <h3 style="color:#92400e">⚠️ Antrenör Bekleniyor</h3>
+          <span id="unassignedCount" style="background:#f59e0b;color:white;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">0</span>
+        </div>
+        <div class="card-body" id="unassignedList">
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <h3 id="dayLessonsTitle">Bugünkü Dersler</h3>
@@ -391,31 +401,6 @@
   </div>
 
   <!-- TRANSFERS -->
-  <!-- DERS HAVUZU TAB -->
-  <div id="tab-pool" class="screen" style="position:relative">
-    <div class="content">
-      <div style="background:linear-gradient(135deg,#1a7a4a,#2d8a5a);color:white;border-radius:var(--radius);padding:16px;margin-bottom:12px">
-        <div style="font-size:15px;font-weight:800;margin-bottom:4px">🎯 Ders Havuzu</div>
-        <div style="font-size:12px;opacity:0.85">Admin'in eklediği dersleri görün ve alın</div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <h3>Bekleyen Dersler</h3>
-          <span id="poolOpenCount" class="badge badge-orange">0 ders</span>
-        </div>
-        <div class="card-body" id="poolLessonsList">
-          <div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">Havuzda bekleyen ders yok</div></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3>Aldığım Dersler</h3></div>
-        <div class="card-body" id="myPoolLessonsList">
-          <div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">Henüz ders almadınız</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div id="tab-transfers" class="screen" style="position:relative">
     <div class="content">
       <div class="card" style="margin-bottom:12px">
@@ -566,10 +551,7 @@
     <button class="nav-btn active" onclick="switchTab('home')">
       <span class="icon">🏠</span>Bugün
     </button>
-    <button class="nav-btn" onclick="switchTab('pool')">
-      <span class="icon">🎯</span>Havuz
-      <span id="poolNotif" style="display:none;background:#dc2626;color:white;border-radius:10px;padding:0 5px;font-size:9px;font-weight:700;position:absolute;top:8px">!</span>
-    </button>
+
     <button class="nav-btn" onclick="switchTab('transfers')">
       <span class="icon">🔄</span>Devir
     </button>
@@ -719,6 +701,7 @@ function setupFirebaseListeners() {
   if (!db || !USE_FIREBASE) return;
   db.ref('lessons').on('value', function(snap) {
     localData.lessons = snap.val() || {};
+    loadUnassignedLessons();
     refreshAll();
     if (currentTab === 'all') loadAllMyLessons();
   });
@@ -746,15 +729,6 @@ function setupFirebaseListeners() {
       if (val.mobileTheme) { try { applyMobileThemeData(val.mobileTheme); } catch(e){} }
       if (val.permissions) { try { applyPermissionsData(val.permissions); } catch(e){} }
     }
-  });
-  // Ders havuzu listener
-  db.ref('pool').on('value', function(snap) {
-    localData.pool = snap.val() || {};
-    if (currentTab === 'pool') loadPoolTab();
-    // Havuzda bekleyen ders varsa notif göster
-    var openCount = Object.values(localData.pool).filter(function(l){ return l.status==='open'; }).length;
-    var notif = document.getElementById('poolNotif');
-    if (notif) notif.style.display = openCount > 0 ? 'inline' : 'none';
   });
 }
 
@@ -952,18 +926,17 @@ function switchTab(tab) {
     if (s.id !== 'mainScreen') s.style.display = 'none';
   });
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  const tabMap = {home:'tab-home',all:'tab-all',pool:'tab-pool',transfers:'tab-transfers',chat:'tab-chat',profile:'tab-profile'};
+  const tabMap = {home:'tab-home',all:'tab-all',transfers:'tab-transfers',chat:'tab-chat',profile:'tab-profile'};
   const tabEl = document.getElementById(tabMap[tab]);
   if (tabEl) tabEl.style.display = 'block';
-  const idx = ['home','pool','transfers','chat','profile'].indexOf(tab);
+  const idx = ['home','transfers','chat','profile'].indexOf(tab);
   const navBtns = document.querySelectorAll('.nav-btn');
   if (idx >= 0 && navBtns[idx]) navBtns[idx].classList.add('active');
   currentTab = tab;
 
-  const titles = {home:'Derslerim',all:'Tüm Dersler',pool:'Ders Havuzu',transfers:'Ders Devri',chat:'Grup Yazışması',profile:'Profilim'};
+  const titles = {home:'Derslerim',all:'Tüm Dersler',transfers:'Ders Devri',chat:'Grup Yazışması',profile:'Profilim'};
   document.getElementById('headerTitle').textContent = titles[tab] || tab;
   if (tab==='all') loadAllMyLessons();
-  if (tab==='pool') loadPoolTab();
   if (tab==='profile') loadProfile();
   if (tab==='chat') {
     loadChat();
@@ -974,7 +947,6 @@ function switchTab(tab) {
 
 // Set initial tab visibility
 document.getElementById('tab-all').style.display='none';
-document.getElementById('tab-pool').style.display='none';
 document.getElementById('tab-transfers').style.display='none';
 document.getElementById('tab-chat').style.display='none';
 document.getElementById('tab-profile').style.display='none';
@@ -1004,7 +976,64 @@ function myLessons() {
   return Object.entries(localData.lessons||{}).filter(([,l])=>l.coachId===currentCoachId);
 }
 
+function loadUnassignedLessons() {
+  // Bugün antrenörsüz olan dersleri göster
+  const todayStr = selectedDate || today();
+  const all = Object.entries(localData.lessons || {});
+  const unassigned = all.filter(([,l]) => l.date === todayStr && !l.coachId && !l.assigned);
+
+  const card = document.getElementById('unassignedCard');
+  const list = document.getElementById('unassignedList');
+  const cnt  = document.getElementById('unassignedCount');
+  if (!card || !list) return;
+
+  if (unassigned.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = 'block';
+  if (cnt) cnt.textContent = unassigned.length + ' ders';
+
+  list.innerHTML = unassigned.map(([id, l]) => `
+    <div style="padding:12px;border-bottom:1px solid #fef3c7">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:700;font-size:15px">${l.time} — ${l.guest}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px">
+            🎾 ${l.court} &nbsp;•&nbsp; ⏱ ${l.duration} saat
+            ${l.room ? '&nbsp;•&nbsp; 🏨 Oda: '+l.room : ''}
+          </div>
+          ${l.note ? '<div style="font-size:12px;color:#6b7280;margin-top:2px">📝 '+l.note+'</div>' : ''}
+        </div>
+        <button onclick="takeUnassignedLesson('${id}')"
+          style="background:#1a7a4a;color:white;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:10px">
+          ✋ Alıyorum
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function takeUnassignedLesson(id) {
+  if (!confirm('Bu dersi almak istediğinize emin misiniz?')) return;
+  if (!currentCoachId || !currentCoach) { showToast('Önce giriş yapın!','error'); return; }
+  // Dersi üstlen — Firebase'e yaz
+  fbSet('lessons/'+id+'/coachId',   currentCoachId);
+  fbSet('lessons/'+id+'/coachName', currentCoach.name);
+  fbSet('lessons/'+id+'/assigned',  true);
+  // localData'yı da güncelle
+  if (localData.lessons[id]) {
+    localData.lessons[id].coachId   = currentCoachId;
+    localData.lessons[id].coachName = currentCoach.name;
+    localData.lessons[id].assigned  = true;
+  }
+  showToast('Ders alındı! ✅ Derslerinize eklendi.', 'success');
+  loadUnassignedLessons();
+  loadDayLessons();
+}
+
 function refreshAll() {
+  loadUnassignedLessons();
   loadDayLessons();
   updateStats();
 }
@@ -1631,177 +1660,3 @@ function applyLogo(dataUrl) {
   if (saved) applyLogo(saved);
 })();
 
-// ============================================================
-// DERS HAVUZU — Mobile pool lesson functions
-// ============================================================
-function loadPoolTab() {
-  const pool = localData.pool || {};
-  const open = Object.entries(pool).filter(([,l]) => l.status === 'open');
-  const mine = Object.entries(pool).filter(([,l]) => l.status === 'taken' && l.coachId === currentCoachId);
-
-  // Open badge
-  const badge = document.getElementById('poolOpenCount');
-  if (badge) badge.textContent = open.length + ' ders';
-  const notif = document.getElementById('poolNotif');
-  if (notif) notif.style.display = open.length > 0 ? 'inline' : 'none';
-
-  // Open lessons list
-  const openList = document.getElementById('poolLessonsList');
-  if (openList) {
-    if (open.length === 0) {
-      openList.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">Havuzda bekleyen ders yok</div></div>';
-    } else {
-      openList.innerHTML = open.sort(([,a],[,b])=>(a.date+a.time).localeCompare(b.date+b.time)).map(([id,l]) => `
-        <div class="lesson-item">
-          <div class="lesson-time">${l.time}</div>
-          <div class="lesson-info">
-            <div class="lesson-guest">${l.guest}</div>
-            <div class="lesson-meta">
-              📅 ${formatDate(l.date)} &nbsp;•&nbsp; 🎾 ${l.court}<br>
-              🏨 Oda: ${l.room||'—'} &nbsp;•&nbsp; ⏱ ${l.duration} saat
-              ${l.note ? '<br>📝 '+l.note : ''}
-            </div>
-            <div class="lesson-actions" style="margin-top:8px">
-              <button class="action-btn edit" style="background:#1a7a4a;color:white;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;border:none;cursor:pointer" onclick="takePoolLesson('${id}')">
-                ✋ Bu Dersi Alıyorum
-              </button>
-            </div>
-          </div>
-        </div>`).join('');
-    }
-  }
-
-  // My taken lessons
-  const myList = document.getElementById('myPoolLessonsList');
-  if (myList) {
-    if (mine.length === 0) {
-      myList.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">Henüz ders almadınız</div></div>';
-    } else {
-      myList.innerHTML = mine.map(([id,l]) => `
-        <div class="lesson-item is-taken" style="border-left:4px solid #16a34a;padding-left:10px">
-          <div class="lesson-time" style="background:#dcfce7;color:#166534">${l.time}</div>
-          <div class="lesson-info">
-            <div class="lesson-guest">${l.guest}</div>
-            <div class="lesson-meta">
-              📅 ${formatDate(l.date)} &nbsp;•&nbsp; 🎾 ${l.court}<br>
-              ⏱ ${l.duration} saat
-            </div>
-            <span class="badge badge-green" style="margin-top:6px;display:inline-block">✅ Alındı</span>
-            <button class="action-btn delete" style="margin-left:8px" onclick="cancelPoolLesson('${id}')">Vazgeç</button>
-          </div>
-        </div>`).join('');
-    }
-  }
-}
-
-function takePoolLesson(id) {
-  if (!confirm('Bu dersi almak istediğinize emin misiniz?')) return;
-  const lesson = (localData.pool || {})[id];
-  if (!lesson) return;
-  // Pool'da güncelle
-  fbSet('pool/'+id+'/status', 'taken');
-  fbSet('pool/'+id+'/coachId', currentCoachId);
-  fbSet('pool/'+id+'/coachName', currentCoach.name);
-  fbSet('pool/'+id+'/takenAt', Date.now());
-  // Admin'e bildirim düş
-  const notifKey = 'notif_'+Date.now();
-  fbSet('notifications/'+notifKey, {
-    type: 'pool_taken',
-    coachName: currentCoach.name,
-    coachId: currentCoachId,
-    guest: lesson.guest,
-    date: lesson.date,
-    time: lesson.time,
-    court: lesson.court,
-    poolId: id,
-    createdAt: Date.now(),
-    read: false
-  });
-  showToast('Ders alındı! Admin bilgilendirildi. ✅', 'success');
-  loadPoolTab();
-}
-
-function cancelPoolLesson(id) {
-  if (!confirm('Bu dersten vazgeçmek istediğinize emin misiniz?')) return;
-  fbSet('pool/'+id+'/status', 'open');
-  fbSet('pool/'+id+'/coachId', null);
-  fbSet('pool/'+id+'/coachName', null);
-  fbSet('pool/'+id+'/takenAt', null);
-  showToast('Ders havuza geri bırakıldı.');
-  loadPoolTab();
-}
-
-// ---- MOBİL LOGO YÖNETİMİ (Profil sekmesi) ----
-function handleMobileLogo(input) {
-  const file = input.files[0];
-  if (!file) return;
-  if (file.size > 2*1024*1024) { showToast("Dosya 2MB'dan kucuk olmali!","error"); return; }
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const dataUrl = e.target.result;
-    localStorage.setItem('academyLogo', dataUrl);
-    applyLogo(dataUrl);
-    // Profil önizleme
-    const prev = document.getElementById('previewLogo');
-    if (prev) { prev.innerHTML = ''; const img = document.createElement('img'); img.src=dataUrl; img.style.cssText='width:100%;height:100%;object-fit:contain;border-radius:12px'; prev.appendChild(img); }
-    showToast('Logo güncellendi! ✅','success');
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeMobileLogo() {
-  localStorage.removeItem('academyLogo');
-  const logoImg = document.getElementById('logoImg');
-  const logoEmoji = document.getElementById('logoEmoji');
-  const headerLogo = document.getElementById('headerLogo');
-  const headerEmoji = document.getElementById('headerLogoEmoji');
-  if (logoImg) { logoImg.style.display='none'; logoImg.src=''; }
-  if (logoEmoji) logoEmoji.style.display='block';
-  if (headerLogo) { headerLogo.style.display='none'; headerLogo.src=''; }
-  if (headerEmoji) headerEmoji.style.display='block';
-  const prev = document.getElementById('previewLogo');
-  if (prev) prev.innerHTML = '🎾';
-  showToast('Logo kaldırıldı.','');
-}
-
-// ---- MOBİL FİREBASE CONFIG ----
-function saveMobileFirebaseConfig() {
-  const jsonText = (document.getElementById('mobileFirebaseJSON')||{}).value?.trim();
-  if (!jsonText) { showToast('Config JSON boş!','error'); return; }
-  try {
-    const config = JSON.parse(jsonText);
-    if (!config.apiKey || !config.databaseURL) {
-      showToast('apiKey ve databaseURL zorunlu!','error'); return;
-    }
-    localStorage.setItem('ta_firebase_config', JSON.stringify(config));
-    localStorage.setItem('ta_firebase_config_shared', JSON.stringify(config));
-    showToast('Firebase config kaydedildi, bağlanılıyor... 🔥','success');
-    setTimeout(() => location.reload(), 1200);
-  } catch(e) {
-    showToast('Geçersiz JSON formatı!','error');
-  }
-}
-
-// Profil sekmesi açılınca Firebase durumunu göster
-function loadProfileFirebaseStatus() {
-  const el = document.getElementById('mobileFirebaseStatus');
-  if (!el) return;
-  const saved = getSavedFirebaseConfig();
-  if (USE_FIREBASE) {
-    el.style.background='#dcfce7'; el.style.color='#166534';
-    el.textContent = '🔥 Firebase canlı bağlı — Proje: '+(saved?.projectId||'');
-  } else if (saved && saved.apiKey) {
-    el.style.background='#fef9c3'; el.style.color='#713f12';
-    el.textContent = '⚡ Config kayıtlı ama bağlantı kurulamadı. Sayfayı yenileyin.';
-  } else {
-    el.style.background='#fee2e2'; el.style.color='#991b1b';
-    el.textContent = '❌ Firebase bağlantısı yok. JSON yapıştırıp bağlanın.';
-  }
-  // Profil logosu önizleme
-  const saved2 = localStorage.getItem('academyLogo');
-  const prev = document.getElementById('previewLogo');
-  if (prev && saved2) { prev.innerHTML=''; const img=document.createElement('img'); img.src=saved2; img.style.cssText='width:100%;height:100%;object-fit:contain;border-radius:12px'; prev.appendChild(img); }
-}
-</script>
-</body>
-</html>
