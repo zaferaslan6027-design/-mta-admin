@@ -1291,30 +1291,14 @@ let FIREBASE_AUTH_READY = false;
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.database();
 
-    // ADIM 1: Anonim giriş başlat
-    firebase.auth().signInAnonymously().catch(err => {
-      console.error('[Firebase] Auth hatası:', err.code, err.message);
-      setConnStatus('error', 'YETKİ HATASI: ' + err.code);
-    });
-
-    // ADIM 2: Auth tamamlandığında DB dinlemeye başla
-    firebase.auth().onAuthStateChanged(user => {
-      if (user) {
-        FIREBASE_AUTH_READY = true;
-        console.log('[Firebase] Auth tamam, uid:', user.uid);
-        // ADIM 3: Network bağlantısını kontrol et
-        db.ref('.info/connected').on('value', snap => {
-          const connected = snap.val() === true;
-          USE_FIREBASE = connected && FIREBASE_AUTH_READY;
-          setConnStatus(USE_FIREBASE ? 'live' : 'connecting');
-          if (USE_FIREBASE) {
-            setupFirebaseListeners();
-          }
-        });
-      } else {
-        FIREBASE_AUTH_READY = false;
-        USE_FIREBASE = false;
-        setConnStatus('connecting');
+    // Auth olmadan direkt bağlan
+    FIREBASE_AUTH_READY = true;
+    db.ref('.info/connected').on('value', snap => {
+      const wasConnected = USE_FIREBASE;
+      USE_FIREBASE = snap.val() === true;
+      setConnStatus(USE_FIREBASE ? 'live' : 'connecting');
+      if (USE_FIREBASE && !wasConnected) {
+        setupFirebaseListeners();
       }
     });
   } catch(e) {
