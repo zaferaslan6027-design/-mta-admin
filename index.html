@@ -323,6 +323,9 @@
       <div class="nav-item" onclick="showPage('lessons')">
         <span class="icon">📅</span><span>Dersler</span>
       </div>
+      <div class="nav-item" onclick="showPage('pool')">
+        <span class="icon">🎯</span><span>Ders Havuzu</span>
+      </div>
       <div class="nav-item" onclick="showPage('coaches')">
         <span class="icon">👤</span><span>Antrenörler</span>
       </div>
@@ -354,6 +357,10 @@
       <h1 id="pageTitle">Gösterge Paneli</h1>
       <div class="topbar-right">
         <div id="connStatus" class="live-badge"><span class="live-dot"></span>CANLI</div>
+        <div style="position:relative;cursor:pointer" onclick="showPage('pool')" title="Ders Havuzu Bildirimleri">
+          <span style="font-size:20px">🔔</span>
+          <span id="notifBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#dc2626;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center">0</span>
+        </div>
         <div id="currentDateTime" style="font-size:13px;color:var(--text-muted)"></div>
       </div>
     </div>
@@ -483,6 +490,53 @@
               </thead>
               <tbody id="allLessonsTable">
                 <tr><td colspan="10" class="empty-state"><div class="big-icon">📅</div>Henüz ders kaydı yok</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- DERS HAVUZU PAGE -->
+      <div id="page-pool" class="page">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div>
+            <h2 style="font-size:18px;font-weight:700">🎯 Ders Havuzu</h2>
+            <p style="font-size:13px;color:var(--text-muted);margin-top:3px">Admin ders ekler, antrenörler kendi telefonlarından seçer</p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddPoolLesson()">+ Havuza Ders Ekle</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div class="stat-card green">
+            <div class="label">Bekleyen Dersler</div>
+            <div class="value" id="pool-pending">0</div>
+            <div class="sub">antrenör bekleniyor</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="label">Alınan Dersler</div>
+            <div class="value" id="pool-taken">0</div>
+            <div class="sub">antrenör atandı</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Havuzdaki Dersler</h3>
+            <div style="display:flex;gap:8px">
+              <select id="poolFilter" onchange="loadPoolLessons()" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px">
+                <option value="">Tümü</option>
+                <option value="open">⏳ Bekleyenler</option>
+                <option value="taken">✅ Alınanlar</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr><th>Tarih</th><th>Saat</th><th>Misafir</th><th>Oda</th><th>Kort</th><th>Süre</th><th>Durum</th><th>Antrenör</th><th>İşlem</th></tr>
+              </thead>
+              <tbody id="poolLessonsTable">
+                <tr><td colspan="9" class="empty-state"><div class="big-icon">🎯</div>Havuzda ders yok</td></tr>
               </tbody>
             </table>
           </div>
@@ -1018,6 +1072,24 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="coachId">
+      <input type="hidden" id="coachPhotoData">
+
+      <!-- Profil Fotoğrafı -->
+      <div class="field">
+        <label>Profil Fotoğrafı</label>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="position:relative;width:72px;height:72px;border-radius:50%;background:var(--green-light);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            <img id="coachPhotoPreview" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
+            <span id="coachPhotoEmoji" style="font-size:28px">👤</span>
+          </div>
+          <div>
+            <input type="file" id="coachPhotoInput" accept="image/*" style="display:none" onchange="handleCoachPhoto(this)">
+            <button type="button" onclick="document.getElementById('coachPhotoInput').click()" class="btn btn-secondary btn-sm">📸 Fotoğraf Seç</button>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Max 1MB — JPG, PNG, WebP</div>
+          </div>
+        </div>
+      </div>
+
       <div class="form-row">
         <div class="field">
           <label>Ad Soyad</label>
@@ -1107,6 +1179,85 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modalTransfer')">İptal</button>
       <button class="btn btn-primary" onclick="saveTransfer()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- POOL LESSON MODAL -->
+<div class="modal-overlay" id="modalPoolLesson">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🎯 Havuza Ders Ekle</h3>
+      <button class="modal-close" onclick="closeModal('modalPoolLesson')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="poolLessonId">
+      <div class="form-row">
+        <div class="field"><label>Tarih</label><input type="date" id="pl-date"></div>
+        <div class="field"><label>Saat</label><input type="time" id="pl-time"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Misafir Adı</label><input type="text" id="pl-guest" placeholder="Misafir adı soyadı"></div>
+        <div class="field"><label>Oda Numarası</label><input type="text" id="pl-room" placeholder="Opsiyonel"></div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Kort</label>
+          <select id="pl-court">
+            <option>Kort 1</option><option>Kort 2</option><option>Kort 3</option><option>Kort 4</option><option>Kort 5</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Süre</label>
+          <select id="pl-duration">
+            <option value="0.5">30 dakika</option>
+            <option value="1" selected>1 saat</option>
+            <option value="1.5">1.5 saat</option>
+            <option value="2">2 saat</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Not</label><textarea id="pl-note" placeholder="Opsiyonel not..."></textarea></div>
+      <div style="background:#f0f9ff;border-radius:8px;padding:12px;font-size:12px;color:#0369a1;margin-top:4px">
+        💡 Bu ders havuza eklendikten sonra antrenörler kendi telefonlarından görecek ve "Bu dersi alıyorum" diyebilecek.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalPoolLesson')">İptal</button>
+      <button class="btn btn-primary" onclick="savePoolLesson()">Havuza Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- GUEST PROFILE MODAL -->
+<div class="modal-overlay" id="modalGuest">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>👤 Misafir Profili</h3>
+      <button class="modal-close" onclick="closeModal('modalGuest')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="guestProfileName" style="font-size:17px;font-weight:800;margin-bottom:16px;color:var(--green)"></div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;background:#f0f9ff;padding:10px;border-radius:8px">
+        💡 Bu bilgiler Player Package Form'a otomatik doldurulacak. Eksik bilgileri buradan tamamlayın.
+      </p>
+      <input type="hidden" id="guestProfileKey">
+      <div class="form-row">
+        <div class="field"><label>Oda Numarası</label><input type="text" id="gp-room" placeholder="Oda no"></div>
+        <div class="field"><label>Yaş</label><input type="text" id="gp-age" placeholder="Misafir yaşı"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Uyruk / Nationality</label><input type="text" id="gp-nationality" placeholder="Türk / Turkish..."></div>
+        <div class="field"><label>T.C. / Kimlik No</label><input type="text" id="gp-tcid" placeholder="T.C. veya Pasaport no"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>E-Mail</label><input type="email" id="gp-email" placeholder="E-posta adresi"></div>
+        <div class="field"><label>Telefon</label><input type="text" id="gp-phone" placeholder="+90..."></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalGuest')">İptal</button>
+      <button class="btn btn-secondary" onclick="saveGuestProfile();closeModal('modalGuest')">💾 Kaydet</button>
     </div>
   </div>
 </div>
@@ -1221,6 +1372,14 @@ function setupFirebaseListeners() {
       if (val.mobileTheme) localStorage.setItem('ta_mobile_theme', JSON.stringify(val.mobileTheme));
       if (val.permissions) localStorage.setItem('ta_permissions', JSON.stringify(val.permissions));
     }
+  });
+  // Pool lesson listener
+  setupPoolListener();
+  // Admin bildirimleri listener
+  setupNotificationsListener();
+  // Misafir profilleri listener
+  db.ref('guests').on('value', snap => {
+    localData.guests = snap.val() || {};
   });
 }
 
@@ -1352,12 +1511,17 @@ function setupFirebaseListeners() {
 function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
-  document.querySelectorAll('.nav-item')[['dashboard','lessons','coaches','guests','transfers','chat','reports','settings'].indexOf(page)].classList.add('active');
+  const pageEl = document.getElementById('page-'+page);
+  if (pageEl) pageEl.classList.add('active');
+  const pageOrder = ['dashboard','lessons','pool','coaches','guests','transfers','chat','reports','settings'];
+  const navItems = document.querySelectorAll('.nav-item');
+  const idx = pageOrder.indexOf(page);
+  if (idx >= 0 && navItems[idx]) navItems[idx].classList.add('active');
   currentPage = page;
-  const titles = {dashboard:'Gösterge Paneli',lessons:'Dersler',coaches:'Antrenörler',guests:'Misafirler',transfers:'Ders Devirleri',chat:'Grup Yazışması',reports:'Raporlar',settings:'Ayarlar'};
+  const titles = {dashboard:'Gösterge Paneli',lessons:'Dersler',pool:'Ders Havuzu',coaches:'Antrenörler',guests:'Misafirler',transfers:'Ders Devirleri',chat:'Grup Yazışması',reports:'Raporlar',settings:'Ayarlar'};
   document.getElementById('pageTitle').textContent = titles[page]||page;
   if(page==='lessons') loadAllLessons();
+  if(page==='pool') loadPoolLessons();
   if(page==='coaches') loadCoachesPage();
   if(page==='guests') loadGuestsPage();
   if(page==='transfers') loadTransfersPage();
@@ -1545,8 +1709,8 @@ function loadCoachesPage() {
     return `
     <div class="card" style="padding:20px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-        <div class="coach-avatar" style="width:52px;height:52px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--green)">
-          ${c.name.split(' ').map(n=>n[0]).join('')}
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--green);overflow:hidden;flex-shrink:0">
+          ${c.photo ? `<img src="${c.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : c.name.split(' ').map(n=>n[0]).join('')}
         </div>
         <div>
           <div style="font-size:16px;font-weight:700">${c.name}</div>
@@ -1608,15 +1772,58 @@ function loadGuestsPage() {
       <td>${g.lessons.length} ders</td>
       <td>${formatDate(g.lastDate)}</td>
       <td>${[...g.coaches].join(', ')}</td>
-      <td><button class="btn btn-secondary btn-sm" onclick="showGuestHistory('${g.name}')">Geçmiş</button></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="showGuestHistory('${g.name}')">Geçmiş</button>
+        <button class="btn btn-primary btn-sm" onclick="openGuestProfile('${g.name}')">👤 Profil</button>
+      </td>
     </tr>`).join('');
 }
 function searchGuests() { loadGuestsPage(); }
 function openAddGuest() { showToast('Misafirler ders kayıtlarından otomatik oluşturulur.'); }
 function showGuestHistory(name) {
   const lessons = Object.values(localData.lessons||{}).filter(l=>l.guest===name);
-  alert(`${name} - Ders Geçmişi:\n\n${lessons.map(l=>`${l.date} ${l.time} - ${l.coachName} - ${l.court} (${l.duration}s)`).join('\n')}`);
+  alert(name + ' - Ders Gecmisi:\n\n' + lessons.map(l=>l.date+' '+l.time+' - '+l.coachName+' - '+l.court+' ('+l.duration+'s)').join('\n'));
 }
+
+// ---- MİSAFİR PROFİL KAYDET ----
+function openGuestProfile(name) {
+  const key = name.toLowerCase().replace(/\s+/g,'_');
+  const g = (localData.guests || {})[key] || {};
+  const lessons = Object.values(localData.lessons||{}).filter(l=>l.guest===name);
+  const lastLesson = lessons.sort((a,b)=>b.date.localeCompare(a.date))[0] || {};
+  
+  document.getElementById('guestProfileName').textContent = '👤 ' + name;
+  document.getElementById('guestProfileKey').value = key;
+  document.getElementById('gp-room').value        = g.room  || lastLesson.room  || '';
+  document.getElementById('gp-age').value         = g.age   || '';
+  document.getElementById('gp-nationality').value = g.nationality || '';
+  document.getElementById('gp-tcid').value        = g.tcid  || '';
+  document.getElementById('gp-email').value       = g.email || '';
+  document.getElementById('gp-phone').value       = g.phone || '';
+  document.getElementById('modalGuest').classList.add('open');
+}
+
+function saveGuestProfile() {
+  const key = document.getElementById('guestProfileKey').value;
+  if (!localData.guests) localData.guests = {};
+  const existing = localData.guests[key] || {};
+  const updated = Object.assign({}, existing, {
+    room:        document.getElementById('gp-room').value,
+    age:         document.getElementById('gp-age').value,
+    nationality: document.getElementById('gp-nationality').value,
+    tcid:        document.getElementById('gp-tcid').value,
+    email:       document.getElementById('gp-email').value,
+    phone:       document.getElementById('gp-phone').value,
+    updatedAt:   Date.now()
+  });
+  localData.guests[key] = updated;
+  fbSet('guests/' + key, updated);
+  showToast('Misafir profili kaydedildi ✅');
+}
+
+
+
+
 
 // ---- TRANSFERS ----
 function loadTransfersPage() {
@@ -1767,10 +1974,19 @@ function quickStatus(id, status) {
   showToast(labels[newStatus]||'');
 }
 
+function resetCoachPhotoUI() {
+  document.getElementById('coachPhotoPreview').style.display = 'none';
+  document.getElementById('coachPhotoPreview').src = '';
+  document.getElementById('coachPhotoEmoji').style.display = 'block';
+  document.getElementById('coachPhotoData').value = '';
+  document.getElementById('coachPhotoInput').value = '';
+}
+
 function openAddCoach() {
   editingCoachId = null;
   document.getElementById('coachModalTitle').textContent = 'Antrenör Ekle';
   ['cName','cUsername','cPassword','cPhone','cSpecialty'].forEach(id => document.getElementById(id).value='');
+  resetCoachPhotoUI();
   document.getElementById('modalCoach').classList.add('open');
 }
 
@@ -1783,6 +1999,15 @@ function editCoach(id) {
   document.getElementById('cPassword').value = c.password;
   document.getElementById('cPhone').value = c.phone||'';
   document.getElementById('cSpecialty').value = c.specialty||'';
+  // Profil fotoğrafı varsa göster
+  if (c.photo) {
+    document.getElementById('coachPhotoPreview').src = c.photo;
+    document.getElementById('coachPhotoPreview').style.display = 'block';
+    document.getElementById('coachPhotoEmoji').style.display = 'none';
+    document.getElementById('coachPhotoData').value = c.photo;
+  } else {
+    resetCoachPhotoUI();
+  }
   document.getElementById('modalCoach').classList.add('open');
 }
 
@@ -1791,7 +2016,13 @@ function saveCoach() {
   const username = document.getElementById('cUsername').value.trim();
   const password = document.getElementById('cPassword').value.trim();
   if (!name||!username||!password) { showToast('Ad, kullanıcı adı ve şifre zorunlu!','error'); return; }
-  const coach = { name, username, password, phone: document.getElementById('cPhone').value, specialty: document.getElementById('cSpecialty').value, active: true };
+  const photo = document.getElementById('coachPhotoData').value || '';
+  const coach = {
+    name, username, password,
+    phone: document.getElementById('cPhone').value,
+    specialty: document.getElementById('cSpecialty').value,
+    photo, active: true
+  };
   const key = editingCoachId || ('coach'+Date.now());
   localData.coaches[key] = coach;
   fbSet('coaches/'+key, coach);
@@ -1961,7 +2192,8 @@ function exportToPrint(lessons, totalH, doneC, undoneC, pendingC) {
   const stColor = { done:'#dcfce7', undone:'#fee2e2', pending:'#f9f9f9' };
   const w = window.open('','_blank');
   w.document.write(`<html><head><title>Tenis Dersleri Raporu</title>
-  <style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1a7a4a}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px 10px;font-size:12px}th{background:#e8f5ef}.summary{display:flex;gap:12px;margin-bottom:16px}.sbox{padding:10px 16px;border-radius:8px;text-align:center}.sval{font-size:22px;font-weight:700}.slbl{font-size:11px}@media print{.no-print{display:none}}</style></head>
+  <style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1a7a4a}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px 10px;font-size:12px}th{background:#e8f5ef}.summary{display:flex;gap:12px;margin-bottom:16px}.sbox{padding:10px 16px;border-radius:8px;text-align:center}.sval{font-size:22px;font-weight:700}.slbl{font-size:11px}@media print{.no-print{display:none}}
+</style></head>
   <body>
   <h1>🎾 Tenis Dersleri Raporu</h1>
   <p style="color:#555">Oluşturma: ${new Date().toLocaleString('tr-TR')}</p>
@@ -1981,7 +2213,8 @@ function exportToPrint(lessons, totalH, doneC, undoneC, pendingC) {
     </tr>`).join('')}
   </table>
   <br><button class="no-print" onclick="window.print()">🖨️ Yazdır / PDF Kaydet</button>
-  </body></html>`);
+  
+</body></html>`);
   w.document.close();
   showToast('PDF penceresi açıldı (Yazdır > PDF Kaydet)');
 }
@@ -2201,8 +2434,10 @@ function saveMobileTheme() {
     bgImg: localStorage.getItem('ta_mobile_bgimg') || '',
     bgOpacity: document.getElementById('mt-bg-opacity').value
   };
+  // Firebase'e yaz — tüm cihazlar anında güncellenir
+  fbSet('settings/mobileTheme', theme);
   localStorage.setItem('ta_mobileTheme', JSON.stringify(theme));
-  showToast('Mobil tema kaydedildi! Antrenörler yenileyince görür ✅');
+  showToast('Mobil tema Firebase\'e kaydedildi! Antrenörler anında görecek ✅');
 }
 
 function resetMobileTheme() {
@@ -2295,13 +2530,16 @@ function onPermChange(cb) {
 function savePermissions() {
   const perms = {};
   document.querySelectorAll('[data-perm]').forEach(cb => { perms[cb.dataset.perm] = cb.checked; });
+  // Firebase'e yaz — tüm mobil cihazlar anında güncellenir
+  fbSet('settings/permissions', perms);
   localStorage.setItem('ta_permissions', JSON.stringify(perms));
-  showToast('Mobil izinler kaydedildi! ✅');
+  showToast('Mobil izinler Firebase\'e kaydedildi! Antrenörler anında etkilenecek ✅');
 }
 
 function resetPermissions() {
   const perms = {};
   PERMISSION_DEFS.forEach(p => perms[p.key] = true);
+  fbSet('settings/permissions', perms);
   localStorage.setItem('ta_permissions', JSON.stringify(perms));
   renderPermissions();
   showToast('Tüm izinler açıldı.');
@@ -2310,6 +2548,7 @@ function resetPermissions() {
 function lockAllPermissions() {
   const perms = {};
   PERMISSION_DEFS.forEach(p => perms[p.key] = false);
+  fbSet('settings/permissions', perms);
   localStorage.setItem('ta_permissions', JSON.stringify(perms));
   renderPermissions();
   showToast('Tüm izinler kapatıldı!', 'error');
@@ -2419,6 +2658,148 @@ document.getElementById('loginPass').addEventListener('keydown', e => {
   if (e.key==='Enter') adminLogin();
 });
 
+// ============================================================
+// DERS HAVUZU — Pool Lesson System
+// ============================================================
+function openAddPoolLesson() {
+  document.getElementById('poolLessonId').value = '';
+  document.getElementById('pl-date').value = today();
+  document.getElementById('pl-time').value = '';
+  document.getElementById('pl-guest').value = '';
+  document.getElementById('pl-room').value = '';
+  document.getElementById('pl-court').value = 'Kort 1';
+  document.getElementById('pl-duration').value = '1';
+  document.getElementById('pl-note').value = '';
+  document.getElementById('modalPoolLesson').classList.add('open');
+}
+
+function savePoolLesson() {
+  const date  = document.getElementById('pl-date').value;
+  const time  = document.getElementById('pl-time').value;
+  const guest = document.getElementById('pl-guest').value.trim();
+  if (!date || !time || !guest) { showToast('Tarih, saat ve misafir zorunlu!','error'); return; }
+  const key = document.getElementById('poolLessonId').value || ('pool'+Date.now());
+  const lesson = {
+    date, time, guest,
+    room: document.getElementById('pl-room').value,
+    court: document.getElementById('pl-court').value,
+    duration: parseFloat(document.getElementById('pl-duration').value),
+    note: document.getElementById('pl-note').value,
+    status: 'open', // open = bekliyor, taken = alındı
+    coachId: null, coachName: null,
+    createdAt: Date.now(), createdBy: 'admin'
+  };
+  fbSet('pool/'+key, lesson);
+  closeModal('modalPoolLesson');
+  showToast('Ders havuza eklendi! Antrenörler görecek ✅');
+}
+
+function loadPoolLessons() {
+  const filter = (document.getElementById('poolFilter')||{}).value || '';
+  const pool = localData.pool || {};
+  let entries = Object.entries(pool);
+  if (filter) entries = entries.filter(([,l]) => l.status === filter);
+  entries.sort(([,a],[,b]) => (b.date+b.time).localeCompare(a.date+a.time));
+
+  const pending = Object.values(pool).filter(l=>l.status==='open').length;
+  const taken   = Object.values(pool).filter(l=>l.status==='taken').length;
+  const pd = document.getElementById('pool-pending');
+  const tk = document.getElementById('pool-taken');
+  if (pd) pd.textContent = pending;
+  if (tk) tk.textContent = taken;
+
+  const tbody = document.getElementById('poolLessonsTable');
+  if (!tbody) return;
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="big-icon">🎯</div>Havuzda ders yok</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map(([id,l]) => `
+    <tr>
+      <td>${formatDate(l.date)}</td>
+      <td><strong>${l.time}</strong></td>
+      <td>${l.guest}</td>
+      <td>${l.room||'—'}</td>
+      <td><span class="court-badge">🎾 ${l.court}</span></td>
+      <td>${l.duration}s</td>
+      <td>${l.status==='open'
+        ? '<span class="badge badge-orange">⏳ Bekliyor</span>'
+        : '<span class="badge badge-green">✅ Alındı</span>'}</td>
+      <td>${l.coachName||'—'}</td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="deletePoolLesson('${id}')">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+
+function deletePoolLesson(id) {
+  if (!confirm('Bu dersi havuzdan kaldırmak istediğinize emin misiniz?')) return;
+  fbRemove('pool/'+id);
+  showToast('Ders havuzdan kaldırıldı.');
+}
+
+// Pool Firebase listener — setupFirebaseListeners içinde çağrılır
+function setupPoolListener() {
+  if (!db) return;
+  db.ref('pool').on('value', snap => {
+    localData.pool = snap.val() || {};
+    if (currentPage === 'pool') loadPoolLessons();
+    // Dashboard'da bekleyen sayısını güncelle
+    const pending = Object.values(localData.pool).filter(l=>l.status==='open').length;
+    const el = document.getElementById('stat-pool');
+    if (el) el.textContent = pending;
+  });
+}
+
+// ============================================================
+// PROFİL RESMİ — Antrenör fotoğrafı yükleme
+// ============================================================
+function handleCoachPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 1*1024*1024) { showToast('Fotoğraf 1MB\'dan küçük olmalı!','error'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const dataUrl = e.target.result;
+    document.getElementById('coachPhotoPreview').src = dataUrl;
+    document.getElementById('coachPhotoPreview').style.display = 'block';
+    document.getElementById('coachPhotoEmoji').style.display = 'none';
+    document.getElementById('coachPhotoData').value = dataUrl;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ============================================================
+// BİLDİRİMLER — Antrenör ders aldığında admin'e düşer
+// ============================================================
+function setupNotificationsListener() {
+  if (!db) return;
+  db.ref('notifications').on('value', snap => {
+    const notifs = snap.val() || {};
+    const unread = Object.values(notifs).filter(n => !n.read);
+    const badge = document.getElementById('notifBadge');
+    if (badge) {
+      badge.textContent = unread.length;
+      badge.style.display = unread.length > 0 ? 'inline' : 'none';
+    }
+    // Toast: yeni bildirim geldiyse göster
+    if (unread.length > 0) {
+      const latest = unread.sort((a,b) => b.createdAt - a.createdAt)[0];
+      if (latest && (Date.now() - latest.createdAt) < 10000) {
+        showToast('🎯 ' + latest.coachName + ' dersi aldı: ' + latest.guest + ' ' + latest.date + ' ' + latest.time);
+      }
+    }
+  });
+}
+
+function markAllNotifsRead() {
+  if (!db) return;
+  db.ref('notifications').once('value', snap => {
+    const notifs = snap.val() || {};
+    Object.keys(notifs).forEach(k => { if (!notifs[k].read) fbSet('notifications/'+k+'/read', true); });
+  });
+}
+
 // ---- LOGO YÖNETİMİ ----
 function handleAdminLogo(input) {
   const file = input.files[0];
@@ -2468,5 +2849,6 @@ function applyAdminLogo(dataUrl) {
   if (saved) applyAdminLogo(saved);
 })();
 </script>
+
 </body>
 </html>
