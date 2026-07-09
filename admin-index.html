@@ -1430,7 +1430,7 @@ function refreshDashboard() {
     tbody.innerHTML = summaryRow + todayLessons.sort((a,b)=>a.time.localeCompare(b.time)).map(l => `
       <tr>
         <td><strong>${l.time}</strong></td>
-        <td>\${l.coachName ? l.coachName : '<span style="color:#dc2626;font-weight:700">⚠️ Atanmadı</span>'}</td>
+        <td>${l.coachName || '<span style="color:#e53e3e">⚠️ Atanmadı</span>'}</td>
         <td>\${l.guest}</td>
         <td><span class="court-badge">🎾 ${l.court}</span></td>
         <td>${l.duration}s</td>
@@ -1519,7 +1519,7 @@ function loadAllLessons() {
     <tr>
       <td>${formatDate(l.date)}</td>
       <td><strong>${l.time}</strong></td>
-      <td>\${l.coachName ? l.coachName : '<span style="color:#dc2626;font-weight:700">⚠️ Atanmadı</span>'}</td>
+      <td>${l.coachName || '<span style="color:#e53e3e">⚠️ Atanmadı</span>'}</td>
       <td>\${l.guest}</td>
       <td>${l.room||'—'}</td>
       <td><span class="court-badge">🎾 ${l.court}</span></td>
